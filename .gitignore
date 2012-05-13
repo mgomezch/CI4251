@@ -1,0 +1,10 @@
+*~
+.*.swp*
+tags
+*.gch
+*.o
+*.out
+*.log
+*.hi
+*.aux
+*.pdf
