@@ -1,3 +1,7 @@
+{-# LANGUAGE
+  UnicodeSyntax
+  #-}
+
 module Data.Maybe.Util
   ( toMaybe
   ) where
@@ -5,5 +9,5 @@ module Data.Maybe.Util
 import Data.Maybe (Maybe)
 import Control.Monad (guard)
 
-toMaybe :: Bool -> a -> Maybe a
+toMaybe ∷ Bool → a → Maybe a
 toMaybe b a = guard b >> return a

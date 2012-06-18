@@ -1,10 +1,13 @@
-{-# LANGUAGE ScopedTypeVariables, TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE
+  ScopedTypeVariables,
+  TypeFamilies,
+  UndecidableInstances,
+  UnicodeSyntax
+  #-}
 
 module Data.Hilbert
-  ( Twice
-  , Half
-  , fromHilbert
-  , toHilbert
+  ( Twice, Half
+  , fromHilbert, toHilbert
   ) where
 
 import Control.Arrow           ((***))
@@ -19,7 +22,7 @@ import Data.Word               (Word8, Word16, Word32, Word64)
 
 
 
-type family Twice t :: *
+type family Twice t ∷ ★
 type instance Twice Word32 = Word64
 type instance Twice Word16 = Word32
 type instance Twice Word8  = Word16
@@ -27,7 +30,7 @@ type instance Twice Int32  = Int64
 type instance Twice Int16  = Int32
 type instance Twice Int8   = Int16
 
-type family Half t :: *
+type family Half t ∷ ★
 type instance Half Word64 = Word32
 type instance Half Word32 = Word16
 type instance Half Word16 = Word8
@@ -44,23 +47,23 @@ type BitValue   = Int
 
 
 fromHilbert
-  :: forall hilbertValue coord.
-     ( Bits    coord
-     , Bounded coord
-     , Bits    hilbertValue
-     , coord ~ Half hilbertValue
-     )
-  => hilbertValue
-  -> (coord, coord)
+  ∷ ∀ hilbertValue coord.
+    ( Bits    coord
+    , Bounded coord
+    , Bits    hilbertValue
+    , coord ~ Half hilbertValue
+    )
+  ⇒ hilbertValue
+  → (coord, coord)
 
 fromHilbert h = go 1 h cBits (minBound, minBound) where
 
   go
-    :: TableIndex
-    -> hilbertValue
-    -> BitLength
-    -> (coord, coord)
-    -> (coord, coord)
+    ∷ TableIndex
+    → hilbertValue
+    → BitLength
+    → (coord, coord)
+    → (coord, coord)
 
   go _ _ 0 p      = p
 
@@ -69,17 +72,17 @@ fromHilbert h = go 1 h cBits (minBound, minBound) where
     in go nt (n `shift` 2) (pred k) (x `shift` 1 + bx, y `shift` 1 + by)
 
 
-  b0, b1 :: hilbertValue -> BitValue
+  b0, b1 ∷ hilbertValue → BitValue
   b0 = fromEnum . flip testBit (hBits - 1)
   b1 = fromEnum . flip testBit (hBits - 2)
 
 
-  cBits, hBits :: BitLength
-  cBits = bitSize (undefined :: coord)
-  hBits = bitSize (undefined :: hilbertValue     )
+  cBits, hBits ∷ BitLength
+  cBits = bitSize (undefined ∷ coord       )
+  hBits = bitSize (undefined ∷ hilbertValue)
 
 
-  table :: Array (TableIndex, BitValue, BitValue) (coord, coord, TableIndex)
+  table ∷ Array (TableIndex, BitValue, BitValue) (coord, coord, TableIndex)
   table = array ((1, 0, 0), (4, 1, 1)) [
         ((1, 0, 0), (0, 0, 2)),   ((2, 0, 0), (0, 0, 1)),   ((3, 0, 0), (1, 1, 4)),   ((4, 0, 0), (1, 1, 3)),
         ((1, 0, 1), (1, 0, 1)),   ((2, 0, 1), (0, 1, 2)),   ((3, 0, 1), (0, 1, 3)),   ((4, 0, 1), (1, 0, 4)),
@@ -89,25 +92,25 @@ fromHilbert h = go 1 h cBits (minBound, minBound) where
 
 
 toHilbert
-  :: forall hilbertValue coord.
-     ( Bits    coord
-     , Bits    hilbertValue
-     , Bounded hilbertValue
-     , Ord     hilbertValue
-     , hilbertValue ~ Twice coord
-     )
-  => (coord, coord)
-  -> hilbertValue
+  ∷ ∀ hilbertValue coord.
+    ( Bits    coord
+    , Bits    hilbertValue
+    , Bounded hilbertValue
+    , Ord     hilbertValue
+    , hilbertValue ~ Twice coord
+    )
+  ⇒ (coord, coord)
+  → hilbertValue
 
 
 toHilbert p = go 1 p cBits minBound where
 
   go
-    :: TableIndex
-    -> (coord, coord)
-    -> Int
-    -> hilbertValue
-    -> hilbertValue
+    ∷ TableIndex
+    → (coord, coord)
+    → Int
+    → hilbertValue
+    → hilbertValue
 
   go _ _      0 n = n
 
@@ -116,13 +119,13 @@ toHilbert p = go 1 p cBits minBound where
     in go nt (join (***) (`shift` 1) (x, y)) (pred k) $ n `shift` 2 + b0 `shift` 1 + b1
 
 
-  b :: coord -> BitValue
+  b ∷ coord → BitValue
   b = fromEnum . flip testBit (cBits - 1)
 
-  cBits :: BitLength
-  cBits = bitSize (undefined :: coord)
+  cBits ∷ BitLength
+  cBits = bitSize (undefined ∷ coord)
 
-  table :: Array (TableIndex, BitValue, BitValue) (hilbertValue, hilbertValue, TableIndex)
+  table ∷ Array (TableIndex, BitValue, BitValue) (hilbertValue, hilbertValue, TableIndex)
   table = array ((1, 0, 0), (4, 1, 1)) [
         ((1, 0, 0), (0, 0, 2)),   ((2, 0, 0), (0, 0, 1)),   ((3, 0, 0), (1, 0, 3)),   ((4, 0, 0), (1, 0, 4)),
         ((1, 0, 1), (1, 1, 4)),   ((2, 0, 1), (0, 1, 2)),   ((3, 0, 1), (0, 1, 3)),   ((4, 0, 1), (1, 1, 1)),
@@ -140,5 +143,5 @@ instance
   , Bounded  hilbertValue
   , Ord      hilbertValue
   , hilbertValue ~ Twice coord
-  ) => Ord (Rectangle coord) where
-  compare = compare `on` (toHilbert :: (coord, coord) -> hilbertValue) . center
+  ) ⇒ Ord (Rectangle coord) where
+  compare = compare `on` (toHilbert ∷ (coord, coord) → hilbertValue) . center
