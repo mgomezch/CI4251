@@ -1,6 +1,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+{- Ignore this file.  It’s old, unused code kept only for reference/fun. -}
+
 import Data.Word (Word16, Word32)
 import Data.Array (array, (!))
 import Data.Bits (shift, testBit)

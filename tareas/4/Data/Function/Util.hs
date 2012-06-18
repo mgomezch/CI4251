@@ -1,4 +1,5 @@
 {-# LANGUAGE
+  ScopedTypeVariables,
   UnicodeSyntax
   #-}
 
@@ -8,15 +9,15 @@ module Data.Function.Util
   , unrot
   ) where
 
-flip' ∷ (a → c → b → d) → a → b → c → d
+flip' ∷ ∀ a b c d. (a → c → b → d) → a → b → c → d
 flip' = (flip .)
 
-rot ∷ (c → a → b → d) → a → b → c → d
+rot ∷ ∀ a b c d. (c → a → b → d) → a → b → c → d
 rot = flip' . flip
 
-unrot ∷ (b → c → a → d) → a → b → c → d
+unrot ∷ ∀ a b c d. (b → c → a → d) → a → b → c → d
 unrot = flip . flip'
 
 infix 1 ?
-(?) ∷ Bool → a → a → a
+(?) ∷ ∀ a. Bool → a → a → a
 (?) c t f = if c then t else f

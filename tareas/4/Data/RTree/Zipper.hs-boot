@@ -1,5 +1,6 @@
 {-# LANGUAGE
   FlexibleContexts,
+  ScopedTypeVariables,
   UndecidableInstances,
   UnicodeSyntax
   #-}
@@ -43,9 +44,9 @@ instance (Eq   coord, Eq   (Twice coord)) ⇒ Eq   (Zipper coord)
 instance (Read coord, Read (Twice coord)) ⇒ Read (Zipper coord)
 instance (Show coord, Show (Twice coord)) ⇒ Show (Zipper coord)
 
-fromRTree             ∷ RT.RTree coord → Zipper coord
-fromEntry             ∷ RT.Entry coord → Zipper coord
-up, down, left, right ∷ Zipper   coord → Maybe (Zipper coord)
-top, start, end       ∷ Zipper   coord → Zipper coord
-toRTreeAt, toRTree    ∷ Zipper   coord → RT.RTree coord
-toEntryAt             ∷ Zipper   coord → RT.Entry coord
+fromRTree             ∷ ∀ coord. RT.RTree coord → Zipper coord
+fromEntry             ∷ ∀ coord. RT.Entry coord → Zipper coord
+up, down, left, right ∷ ∀ coord. Zipper   coord → Maybe (Zipper coord)
+top, start, end       ∷ ∀ coord. Zipper   coord → Zipper coord
+toRTreeAt, toRTree    ∷ ∀ coord. Zipper   coord → RT.RTree coord
+toEntryAt             ∷ ∀ coord. Zipper   coord → RT.Entry coord

@@ -52,7 +52,7 @@ deriving instance (Show coord, Show (Twice coord)) ⇒ Show (Zipper coord)
 
 
 
-fromRTree ∷ RT.RTree coord → Zipper coord
+fromRTree ∷ ∀ coord. RT.RTree coord → Zipper coord
 fromRTree t = case t of
   RT.Leaf {..} → Leaf { parent = mzero, .. }
 
@@ -65,7 +65,7 @@ fromRTree t = case t of
 
 
 
-fromEntry ∷ RT.Entry coord → Zipper coord
+fromEntry ∷ ∀ coord. RT.Entry coord → Zipper coord
 fromEntry (RT.Entry {..}) = Entry { parent = mzero, .. }
 
 
@@ -77,6 +77,7 @@ up z = do
   return $ case p of
     Node  { left_entries = _:ls } → p { left_entries = (toEntryAt z): ls }
     Entry {} → p { child = toRTreeAt z }
+    _ → error "Unexpected zipper structure when trying to zip up"
 
 
 
@@ -114,22 +115,24 @@ right z = case z of
 
 
 
-top, start, end ∷ Zipper coord → Zipper coord
+top, start, end ∷ ∀ coord. Zipper coord → Zipper coord
 top   z = maybe z top   $ up    z
 start z = maybe z start $ left  z
 end   z = maybe z end   $ right z
 
 
 
-toRTreeAt, toRTree ∷ Zipper coord → RT.RTree coord
+toRTreeAt, toRTree ∷ ∀ coord. Zipper coord → RT.RTree coord
 
 toRTreeAt z = case z of
   Leaf {..} → RT.Leaf {..}
   Node {..} → RT.Node { entries = reverse left_entries ++ right_entries }
+  _         → error "Statically undetected misuse of toRTreeAt caused by the programmer’s poor understanding of the type system. :-("
 
 toRTree = toRTreeAt . top
 
 
 
-toEntryAt ∷ Zipper coord → RT.Entry coord
+toEntryAt ∷ ∀ coord. Zipper coord → RT.Entry coord
 toEntryAt (Entry {..}) = RT.Entry {..}
+toEntryAt _            = error "Statically undetected misuse of toEntryAt caused by the programmer’s poor understanding of the type system. :-("

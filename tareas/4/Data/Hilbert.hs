@@ -16,7 +16,6 @@ import Control.Monad.Instances ()
 import Data.Array              ((!), Array, array)
 import Data.Bits               (Bits, bitSize, shift, testBit)
 import Data.Function           (on)
-import Data.Int                (Int8, Int16, Int32, Int64)
 import Data.Rectangle          (Rectangle, center)
 import Data.Word               (Word8, Word16, Word32, Word64)
 
@@ -26,17 +25,11 @@ type family Twice t ∷ ★
 type instance Twice Word32 = Word64
 type instance Twice Word16 = Word32
 type instance Twice Word8  = Word16
-type instance Twice Int32  = Int64
-type instance Twice Int16  = Int32
-type instance Twice Int8   = Int16
 
 type family Half t ∷ ★
 type instance Half Word64 = Word32
 type instance Half Word32 = Word16
 type instance Half Word16 = Word8
-type instance Half Int64  = Int32
-type instance Half Int32  = Int16
-type instance Half Int16  = Int8
 
 
 
@@ -135,7 +128,7 @@ toHilbert p = go 1 p cBits minBound where
 
 
 -- FIXME: compare r r' == EQ does NOT imply r == r'
--- FIXME: Is there a way to make this not be an orphan instance?  (preferably something that doesn’t involve mutually recursive modules…)
+-- FIXME: Is there a way to make this not be an orphan instance without introducing more cycles in the module import graph?
 instance
   ( Bits     coord
   , Integral coord

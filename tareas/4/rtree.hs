@@ -1,12 +1,14 @@
 {-# LANGUAGE
+  ScopedTypeVariables,
   UnicodeSyntax
   #-}
 
 module Main {-(main)-} where
 
-import Data.Hilbert
-import Data.RTree
-import Data.Rectangle
+import Control.Monad (foldM)
+import Data.Hilbert   as H
+import Data.RTree     as RT
+import Data.Rectangle as R
 import Data.Word (Word16)
 
 type Rectangle16 = Rectangle Word16
@@ -19,7 +21,8 @@ main = do
   print tr3
   print tr4
   print tt1
-  print $ search tt1 $ Rectangle 1 3 1 3
+  print $ maybe  undefined id $ search tt1 $ Rectangle 1 3 1 3
+  print $ either undefined id $ foldM RT.insert RT.empty [tr1, tr2, tr3, tr4]
 
 
 
