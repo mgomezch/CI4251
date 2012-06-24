@@ -21,7 +21,7 @@ module Main (main) where
 import Control.Arrow.Unicode           ((⁂))
 import Control.Category.Unicode        ((⋙))
 import Control.Monad.Unicode           ((=≪), (≫), (≫=))
-import Data.Bool.Unicode               ((∨))
+import Data.Bool.Unicode               ((∧), (∨))
 import Data.Eq.Unicode                 ((≠), (≡))
 import Data.Function.Unicode           ((∘))
 import Data.Ord.Unicode                ((≤))
@@ -34,7 +34,7 @@ import Control.Concurrent.STM.TVar     (TVar, modifyTVar, newTVarIO, readTVar, w
 import Control.Exception               (finally, uninterruptibleMask_)
 import Control.Monad                   (forever, guard, mapM, mapM_, mzero, return, when)
 import Control.Monad.STM               (STM, atomically, retry)
-import Data.Bool                       ((||), Bool(False))
+import Data.Bool                       (Bool(False))
 import Data.Data                       (Data)
 import Data.Eq                         (Eq)
 import Data.Foldable                   (foldl')
@@ -48,6 +48,7 @@ import Data.Maybe                      (Maybe(Nothing, Just), fromJust, maybe)
 import Data.Ord                        ((<))
 import Data.Sequence                   ((<|), (|>), Seq, ViewL((:<)), empty, viewl)
 import Data.String                     (String)
+import Data.Tuple                      (fst)
 import Data.Typeable                   (Typeable)
 import Prelude                         ( (*), (+), (-), (^), otherwise
                                        , Bounded, minBound, maxBound
@@ -58,7 +59,7 @@ import System.Console.CmdArgs.Implicit (groupname, help, ignore, helpArg, name, 
 import System.Console.CmdArgs.Quote    ((&=#), cmdArgs#, cmdArgsQuote)
 import System.Exit                     (exitFailure)
 import System.IO                       (IO, putStrLn)
-import System.Random                   (Random, RandomGen, getStdRandom, randomR)
+import System.Random                   (Random, RandomGen, getStdRandom, newStdGen, randomR)
 
 
 
@@ -85,7 +86,7 @@ instance Show Persona where
     Mujer              → "F"
     PersonalDeLimpieza → "C"
 
-pr ∷ (?args ∷ Unisex) ⇒ Persona → Int
+pr ∷ (?args ∷ Args) ⇒ Persona → Int
 pr p = f ?args
   where
     f = case p of
@@ -94,23 +95,23 @@ pr p = f ?args
       PersonalDeLimpieza → cprob
 
 -- Probabilidad acumulada hasta este tipo de persona, inclusive
-accPr ∷ (?args ∷ Unisex) ⇒ Persona → Int
+accPr ∷ (?args ∷ Args) ⇒ Persona → Int
 accPr = sum ∘ map pr ∘ enumFromTo minBound
 
 -- Probabilidad acumulada hasta este tipo de persona, no inclusive
-accPr' ∷ (?args ∷ Unisex) ⇒ Persona → Int
+accPr' ∷ (?args ∷ Args) ⇒ Persona → Int
 accPr' p = if p ≡ minBound then 0 else accPr (pred p)
 
-unAccPr ∷ (?args ∷ Unisex) ⇒ Int → Persona
+unAccPr ∷ (?args ∷ Args) ⇒ Int → Persona
 unAccPr n
   | n ≤ accPr Hombre = Hombre
   | n ≤ accPr Mujer  = Mujer
   | otherwise        = PersonalDeLimpieza
 
-randomP ∷ (?args ∷ Unisex, RandomGen γ) ⇒ γ → (Persona, γ)
+randomP ∷ (?args ∷ Args, RandomGen γ) ⇒ γ → (Persona, γ)
 randomP = randomRP (minBound, maxBound)
 
-randomRP ∷ (?args ∷ Unisex, RandomGen γ) ⇒ (Persona, Persona) → γ → (Persona, γ)
+randomRP ∷ (?args ∷ Args, RandomGen γ) ⇒ (Persona, Persona) → γ → (Persona, γ)
 randomRP = (succ ∘ accPr') ⁂ accPr ⋙ randomR ⋙ (⋙ first unAccPr)
 
 
@@ -125,21 +126,22 @@ instance Show Baño where
 
 
 data Shared = S
-  { args   ∷ Unisex
-  , output ∷ TChan String
+  { output ∷ TChan String
   , queue  ∷ TVar (Seq Persona)
   , baño   ∷ TVar Baño
+  , countC ∷ TVar Int
   }
 
-data Unisex = Unisex
-  { gdelay, grange ∷ Int
+data Args = Args
+  { gdelay, grange                   ∷ Int
   , mdelay, mrange, mcapacity, mprob ∷ Int
   , fdelay, frange, fcapacity, fprob ∷ Int
   , cdelay, crange, ccapacity, cprob ∷ Int
+  , singleton                        ∷ Bool
   }
   deriving (Data, Show, Typeable)
 
-delay ∷ (?args ∷ Unisex) ⇒ Persona → Int
+delay ∷ (?args ∷ Args) ⇒ Persona → Int
 delay p = f ?args
   where
     f = case p of
@@ -147,7 +149,7 @@ delay p = f ?args
       Mujer              → fdelay
       PersonalDeLimpieza → cdelay
 
-range ∷ (?args ∷ Unisex) ⇒ Persona → Int
+range ∷ (?args ∷ Args) ⇒ Persona → Int
 range p = f ?args
   where
     f = case p of
@@ -155,7 +157,7 @@ range p = f ?args
       Mujer              → frange
       PersonalDeLimpieza → crange
 
-capacity ∷ (?args ∷ Unisex) ⇒ Persona → Int
+capacity ∷ (?args ∷ Args) ⇒ Persona → Int
 capacity p = f ?args
   where
     f = case p of
@@ -165,18 +167,30 @@ capacity p = f ?args
 
 
 
-generator ∷ (?args ∷ Unisex) ⇒ Shared → IO ()
+generator ∷ (?args ∷ Args) ⇒ Shared → IO ()
 generator s @ S {..} = forever $ do
-  r ← getStdRandom $ randomP
-
-  let
-    push = case r of
-      PersonalDeLimpieza → pushFront
-      _                  → pushBack
+  g ← newStdGen
 
   atomically $ do
-    push s r
-    writeTChan output $ "Nuevo " ⧺ show r
+    c ← readTVar countC
+    let
+      r  = fst $ randomP g
+      r' = fst $ randomRP (Hombre, Mujer) g
+
+      p =
+        if singleton ?args
+           ∧ r ≡ PersonalDeLimpieza
+           ∧ c ≠ 0
+        then r'
+        else r
+
+      push = case p of
+        PersonalDeLimpieza → pushFront
+        _                  → pushBack
+
+    push s p
+    when (p ≡ PersonalDeLimpieza) $ modifyTVar countC succ
+    writeTChan output $ "Nuevo " ⧺ show p
     report s
 
   let
@@ -190,9 +204,11 @@ printer ∷ Shared → IO ()
 printer S {..} = forever $ putStrLn =≪ (atomically $ readTChan output)
 
 
-door ∷ (?args ∷ Unisex) ⇒ Shared → IO ()
+door ∷ (?args ∷ Args) ⇒ Shared → IO ()
 door s @ S {..} = forever $ do
-  p ← atomically $ do
+  g ← newStdGen
+
+  (p, t) ← atomically $ do
     p ← maybe retry return =≪ pop s
     b ← readTVar baño
     case unBaño b of
@@ -200,14 +216,16 @@ door s @ S {..} = forever $ do
       Just (bp, n) → do
         when (p ≠ bp ∨ n ≡ capacity p) retry
         writeTVar baño $ Baño $ return (p, succ n)
-    writeTChan output $ "Entra " ⧺ show p
-    report s
-    return p
 
-  let
-    d = delay p
-    j = range p
-  t ← getStdRandom $ randomR (d - j, d + j)
+    let
+      d = delay p
+      j = range p
+      t = fst $ randomR (d - j, d + j) g
+
+    writeTChan output $ "Entra " ⧺ show p ⧺ "(t = " ⧺ show t ⧺ "μs)"
+    report s
+    return (p, t)
+
   forkIO $ user p t s
 
 
@@ -217,9 +235,9 @@ user p t s @ S {..} = do
   atomically $ do
     let f (x, n) = guard (n ≠ 1) ≫ return (x, pred n)
     modifyTVar baño (Baño ∘ f ∘ fromJust ∘ unBaño)
-    writeTChan output $ "Sale " ⧺ show p ⧺ " (tardó " ⧺ show t ⧺ ")"
+    when (p ≡ PersonalDeLimpieza) $ modifyTVar countC pred
+    writeTChan output $ "Sale " ⧺ show p ⧺ " (t = " ⧺ show t ⧺ "μs)"
     report s
-
 
 
 
@@ -266,7 +284,7 @@ pop S {..} = do
 
 
 $(cmdArgsQuote [d|
-  unisex = Unisex
+  unisex = Args
     { gdelay    =  500000 &=# groupname "Generación"             &=# name "g" &=# typ "μs" &=# help "Tiempo promedio de generación"
     , grange    =  100000                                        &=# name "G" &=# typ "μs" &=# help "Radio de variación del tiempo promedio de generación"
 
@@ -284,13 +302,14 @@ $(cmdArgsQuote [d|
     , crange    =  100000                                        &=# name "C" &=# typ "μs" &=# help "Radio de variación del tiempo promedio de ocupación del baño por personal de limpieza"
     , ccapacity =       1                                                     &=# typ "n"  &=# help "Número máximo de personal de limpieza que puede trabajar en el baño simultáneamente"
     , cprob     =       2                                                     &=# typ "%"  &=# help "Probabilidad de generación de personal de limpieza"
+    , singleton =   False                                        &=# name "s"              &=# help "Restringir la ocurrencia simultánea del personal de limpieza a uno"
     }
     &=# program "Unisex"
     &=# summary "Solución de Manuel Gómez <targen@gmail.com> a la tarea 5 de CI4251 (Programación funcional avanzada) en Abril–Julio de 2012 en la Universidad Simón Bolívar"
     &=# helpArg [help "Mostrar este mensaje de ayuda"]
     &=# versionArg [ignore]
 
-  runArgs = cmdArgs# unisex :: IO Unisex
+  runArgs = cmdArgs# unisex :: IO Args
   |])
 
 
@@ -299,7 +318,7 @@ main ∷ IO ()
 main = do
   args ← runArgs
 
-  let anyNegative = everything (||) (mkQ False ((< 0) :: Int → Bool)) args
+  let anyNegative = everything (∨) (mkQ False ((< 0) :: Int → Bool)) args
   when anyNegative $ do
       putStrLn "Ningún argumento numérico puede ser negativo."
       exitFailure
@@ -307,6 +326,7 @@ main = do
   output ← newTChanIO
   queue  ← newTVarIO empty
   baño   ← newTVarIO $ Baño mzero
+  countC ← newTVarIO 0
   ids    ← newIORef mzero
 
   let
