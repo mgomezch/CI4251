@@ -1,6 +1,7 @@
 {-# LANGUAGE
     BangPatterns,
     DeriveDataTypeable,
+    ImplicitParams,
     MagicHash,
     RecordWildCards,
     TemplateHaskell,
@@ -32,10 +33,13 @@ import Control.Concurrent.STM.TVar     (TVar, modifyTVar, newTVarIO, readTVar, w
 import Control.Exception               (finally, uninterruptibleMask_)
 import Control.Monad                   (forever, guard, mapM, mapM_, mzero, return, when)
 import Control.Monad.STM               (STM, atomically, retry)
+import Data.Bool                       ((||), Bool(False))
 import Data.Data                       (Data)
 import Data.Eq                         (Eq)
 import Data.Foldable                   (foldl')
 import Data.Function                   (($))
+import Data.Generics.Aliases           (mkQ)
+import Data.Generics.Schemes           (everything)
 import Data.IORef                      (newIORef, readIORef, writeIORef)
 import Data.Int                        (Int)
 import Data.List                       (any, drop, length, map, sum)
@@ -80,8 +84,8 @@ instance Show Persona where
     Mujer              → "F"
     PersonalDeLimpieza → "C"
 
-pr ∷ Unisex → Persona → Int
-pr args p = f args
+pr ∷ (?args ∷ Unisex) ⇒ Persona → Int
+pr p = f ?args
   where
     f = case p of
       Hombre             → mprob
@@ -89,24 +93,24 @@ pr args p = f args
       PersonalDeLimpieza → cprob
 
 -- Probabilidad acumulada hasta este tipo de persona, inclusive
-accPr ∷ Unisex → Persona → Int
-accPr args = sum ∘ map (pr args) ∘ enumFromTo minBound
+accPr ∷ (?args ∷ Unisex) ⇒ Persona → Int
+accPr = sum ∘ map pr ∘ enumFromTo minBound
 
 -- Probabilidad acumulada hasta este tipo de persona, no inclusive
-accPr' ∷ Unisex → Persona → Int
-accPr' args p = if p ≡ minBound then 0 else accPr args (pred p)
+accPr' ∷ (?args ∷ Unisex) ⇒ Persona → Int
+accPr' p = if p ≡ minBound then 0 else accPr (pred p)
 
-unAccPr ∷ Unisex → Int → Persona
-unAccPr args n
-  | n ≤ accPr args Hombre = Hombre
-  | n ≤ accPr args Mujer  = Mujer
-  | otherwise             = PersonalDeLimpieza
+unAccPr ∷ (?args ∷ Unisex) ⇒ Int → Persona
+unAccPr n
+  | n ≤ accPr Hombre = Hombre
+  | n ≤ accPr Mujer  = Mujer
+  | otherwise        = PersonalDeLimpieza
 
-randomP ∷ (RandomGen γ) ⇒ Unisex → γ → (Persona, γ)
-randomP args = randomRP args (minBound, maxBound)
+randomP ∷ (?args ∷ Unisex, RandomGen γ) ⇒ γ → (Persona, γ)
+randomP = randomRP (minBound, maxBound)
 
-randomRP ∷ (RandomGen γ) ⇒ Unisex → (Persona, Persona) → γ → (Persona, γ)
-randomRP args = (succ ∘ accPr' args) ⁂ accPr args ⋙ randomR ⋙ (⋙ first (unAccPr args))
+randomRP ∷ (?args ∷ Unisex, RandomGen γ) ⇒ (Persona, Persona) → γ → (Persona, γ)
+randomRP = (succ ∘ accPr') ⁂ accPr ⋙ randomR ⋙ (⋙ first unAccPr)
 
 
 
@@ -134,24 +138,24 @@ data Unisex = Unisex
   }
   deriving (Data, Show, Typeable)
 
-delay ∷ Unisex → Persona → Int
-delay args p = f args
+delay ∷ (?args ∷ Unisex) ⇒ Persona → Int
+delay p = f ?args
   where
     f = case p of
       Hombre             → mdelay
       Mujer              → fdelay
       PersonalDeLimpieza → cdelay
 
-range ∷ Unisex → Persona → Int
-range args p = f args
+range ∷ (?args ∷ Unisex) ⇒ Persona → Int
+range p = f ?args
   where
     f = case p of
       Hombre             → mrange
       Mujer              → frange
       PersonalDeLimpieza → crange
 
-capacity ∷ Unisex → Persona → Int
-capacity args p = f args
+capacity ∷ (?args ∷ Unisex) ⇒ Persona → Int
+capacity p = f ?args
   where
     f = case p of
       Hombre             → mcapacity
@@ -160,9 +164,9 @@ capacity args p = f args
 
 
 
-generator ∷ Shared → IO ()
+generator ∷ (?args ∷ Unisex) ⇒ Shared → IO ()
 generator s @ S {..} = forever $ do
-  r ← getStdRandom $ randomP args
+  r ← getStdRandom $ randomP
 
   let
     push = case r of
@@ -175,18 +179,17 @@ generator s @ S {..} = forever $ do
     report s
 
   let
-    d = gdelay args
-    j = grange args
+    d = gdelay ?args
+    j = grange ?args
   t ← getStdRandom $ randomR (d - j, d + j)
-  threadDelay $ t
+  threadDelay t
 
 
 printer ∷ Shared → IO ()
-printer S {..} = forever $ do
-  putStrLn =≪ (atomically $ readTChan output)
+printer S {..} = forever $ putStrLn =≪ (atomically $ readTChan output)
 
 
-door ∷ Shared → IO ()
+door ∷ (?args ∷ Unisex) ⇒ Shared → IO ()
 door s @ S {..} = forever $ do
   p ← atomically $ do
     p ← maybe retry return =≪ pop s
@@ -194,15 +197,15 @@ door s @ S {..} = forever $ do
     case unBaño b of
       Nothing → writeTVar baño $ Baño $ return (p, 1)
       Just (bp, n) → do
-        when (p ≠ bp ∨ n ≡ capacity args p) retry
+        when (p ≠ bp ∨ n ≡ capacity p) retry
         writeTVar baño $ Baño $ return (p, succ n)
     writeTChan output $ "Entra " ⧺ show p
     report s
     return p
 
   let
-    d = delay args p
-    j = range args p
+    d = delay p
+    j = range p
   t ← getStdRandom $ randomR (d - j, d + j)
   forkIO $ user p t s
 
@@ -294,14 +297,9 @@ $(cmdArgsQuote [d|
 main ∷ IO ()
 main = do
   args ← runArgs
-  when (
-    any (< 0) $ map ($ args)
-      [ gdelay, grange
-      , mdelay, mrange, mcapacity, mprob
-      , fdelay, frange, fcapacity, fprob
-      , cdelay, crange, ccapacity, cprob
-      ]
-    ) $ do
+
+  let anyNegative = everything (||) (mkQ False ((< 0) :: Int → Bool)) args
+  when anyNegative $ do
       putStrLn "Ningún argumento numérico puede ser negativo."
       exitFailure
 
@@ -309,8 +307,9 @@ main = do
   queue  ← newTVarIO empty
   baño   ← newTVarIO $ Baño mzero
   ids    ← newIORef mzero
+
   let
-    threads = [generator, printer, door]
+    threads = let ?args = args in [generator, printer, door]
 
     s = S {..}
     start = uninterruptibleMask_ $ writeIORef ids =≪ mapM fork threads
