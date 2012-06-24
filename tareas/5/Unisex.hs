@@ -50,17 +50,39 @@ import Data.Sequence                   ((<|), (|>), Seq, ViewL((:<)), empty, vie
 import Data.String                     (String)
 import Data.Tuple                      (fst)
 import Data.Typeable                   (Typeable)
-import Prelude                         ( (*), (+), (-), (^), otherwise
+import Prelude                         ( (*), (+), (-), (^), otherwise, undefined
                                        , Bounded, minBound, maxBound
                                        , Enum, enumFromTo, pred, succ
                                        , Show, show
                                        )
-import System.Console.CmdArgs.Implicit (groupname, help, ignore, helpArg, name, program, summary, typ, versionArg)
+import System.Console.CmdArgs.Implicit (Ann, groupname, help, ignore, helpArg, name, program, summary, typ, versionArg)
 import System.Console.CmdArgs.Quote    ((&=#), cmdArgs#, cmdArgsQuote)
 import System.Exit                     (exitFailure)
 import System.IO                       (IO, putStrLn)
 import System.Random                   (Random, RandomGen, getStdRandom, newStdGen, randomR)
 
+
+
+def ∷ String → Int
+def a = case a of
+  "gdelay" →  500000
+  "grange" →  100000
+
+  "mdelay" →  400000
+  "mrange" →  200000
+  "mcap"   →       3
+  "mprob"  →      49
+
+  "fdelay" →  700000
+  "frange" →  400000
+  "fcap"   →       3
+  "fprob"  →      49
+
+  "cdelay" → 1000000
+  "crange" →  100000
+  "ccap"   →       1
+  "cprob"  →       2
+  _        → undefined
 
 
 
@@ -133,11 +155,11 @@ data Shared = S
   }
 
 data Args = Args
-  { gdelay, grange                   ∷ Int
-  , mdelay, mrange, mcapacity, mprob ∷ Int
-  , fdelay, frange, fcapacity, fprob ∷ Int
-  , cdelay, crange, ccapacity, cprob ∷ Int
-  , singleton                        ∷ Bool
+  { gdelay, grange              ∷ Int
+  , mdelay, mrange, mcap, mprob ∷ Int
+  , fdelay, frange, fcap, fprob ∷ Int
+  , cdelay, crange, ccap, cprob ∷ Int
+  , c1                          ∷ Bool
   }
   deriving (Data, Show, Typeable)
 
@@ -157,13 +179,13 @@ range p = f ?args
       Mujer              → frange
       PersonalDeLimpieza → crange
 
-capacity ∷ (?args ∷ Args) ⇒ Persona → Int
-capacity p = f ?args
+cap ∷ (?args ∷ Args) ⇒ Persona → Int
+cap p = f ?args
   where
     f = case p of
-      Hombre             → mcapacity
-      Mujer              → fcapacity
-      PersonalDeLimpieza → ccapacity
+      Hombre             → mcap
+      Mujer              → fcap
+      PersonalDeLimpieza → ccap
 
 
 
@@ -178,7 +200,7 @@ generator s @ S {..} = forever $ do
       r' = fst $ randomRP (Hombre, Mujer) g
 
       p =
-        if singleton ?args
+        if c1 ?args
            ∧ r ≡ PersonalDeLimpieza
            ∧ c ≠ 0
         then r'
@@ -214,7 +236,7 @@ door s @ S {..} = forever $ do
     case unBaño b of
       Nothing → writeTVar baño $ Baño $ return (p, 1)
       Just (bp, n) → do
-        when (p ≠ bp ∨ n ≡ capacity p) retry
+        when (p ≠ bp ∨ n ≡ cap p) retry
         writeTVar baño $ Baño $ return (p, succ n)
 
     let
@@ -282,30 +304,55 @@ pop S {..} = do
     _         → return mzero
 
 
+hdelay, hrange, hcap, hprob ∷ String
+hdelay = "Tiempo promedio de uso del baño"
+hrange = "Radio de variación del tiempo de uso"
+hcap   = "Número máximo que puede usar el baño simultáneamente"
+hprob  = "Probabilidad de generación"
+hc1    = "(off) Restringir la ocurrencia simultánea a 1"
+
+gG, gM, gF, gC ∷ Ann
+gG = groupname "Generación"
+gM = groupname "\nHombres"
+gF = groupname "\nMujeres"
+gC = groupname "\nPersonal de limpieza"
+
+h ∷ String → Ann
+h a = help $ "(" ⧺ show (def a) ⧺ ") " ⧺ case a of
+  "mdelay" → hdelay; "mrange" → hrange; "mprob" → hprob; "mcap" → hcap
+  "fdelay" → hdelay; "frange" → hrange; "fprob" → hprob; "fcap" → hcap
+  "cdelay" → hdelay; "crange" → hrange; "cprob" → hprob; "ccap" → hcap
+  "gdelay" → "Tiempo promedio de generación"
+  "grange" → "Radio de variación del tiempo promedio de generación"
+  _        → undefined
 
 $(cmdArgsQuote [d|
-  unisex = Args
-    { gdelay    =  500000 &=# groupname "Generación"             &=# name "g" &=# typ "μs" &=# help "Tiempo promedio de generación"
-    , grange    =  100000                                        &=# name "G" &=# typ "μs" &=# help "Radio de variación del tiempo promedio de generación"
+  unisex = let n = name; t = typ in Args
+    { gdelay = def "gdelay" &=# gG &=# n "g" &=# t "μs" &=# h "gdelay"
+    , grange = def "grange"        &=# n "G" &=# t "μs" &=# h "grange"
 
-    , mdelay    =  400000 &=# groupname "\nHombres"              &=# name "m" &=# typ "μs" &=# help "Tiempo promedio de uso del baño por hombres"
-    , mrange    =  200000                                        &=# name "M" &=# typ "μs" &=# help "Radio de variación del tiempo promedio de uso del baño por hombres"
-    , mcapacity =       3                                                     &=# typ "n"  &=# help "Número máximo de hombres que pueden usar el baño simultáneamente"
-    , mprob     =      49                                                     &=# typ "%"  &=# help "Probabilidad de generación de hombres"
+    , mdelay = def "mdelay" &=# gM &=# n "m" &=# t "μs" &=# h "mdelay"
+    , mrange = def "mrange"        &=# n "M" &=# t "μs" &=# h "mrange"
+    , mcap   = def "mcap"                    &=# t "n"  &=# h "mcap"
+    , mprob  = def "mprob"                   &=# t "%"  &=# h "mprob"
 
-    , fdelay    =  700000 &=# groupname "\nMujeres"              &=# name "f" &=# typ "μs" &=# help "Tiempo promedio de uso del baño por mujeres"
-    , frange    =  400000                                        &=# name "F" &=# typ "μs" &=# help "Radio de variación del tiempo promedio de uso del baño por mujeres"
-    , fcapacity =       3                                                     &=# typ "n"  &=# help "Número máximo de mujeres que pueden usar el baño simultáneamente"
-    , fprob     =      49                                                     &=# typ "%"  &=# help "Probabilidad de generación de mujeres"
+    , fdelay = def "fdelay" &=# gF &=# n "f" &=# t "μs" &=# h "fdelay"
+    , frange = def "frange"        &=# n "F" &=# t "μs" &=# h "frange"
+    , fcap   = def "fcap"                    &=# t "n"  &=# h "fcap"
+    , fprob  = def "fprob"                   &=# t "%"  &=# h "fprob"
 
-    , cdelay    = 1000000 &=# groupname "\nPersonal de limpieza" &=# name "c" &=# typ "μs" &=# help "Tiempo promedio de ocupación del baño por personal de limpieza"
-    , crange    =  100000                                        &=# name "C" &=# typ "μs" &=# help "Radio de variación del tiempo promedio de ocupación del baño por personal de limpieza"
-    , ccapacity =       1                                                     &=# typ "n"  &=# help "Número máximo de personal de limpieza que puede trabajar en el baño simultáneamente"
-    , cprob     =       2                                                     &=# typ "%"  &=# help "Probabilidad de generación de personal de limpieza"
-    , singleton =   False                                        &=# name "s"              &=# help "Restringir la ocurrencia simultánea del personal de limpieza a uno"
+    , cdelay = def "cdelay" &=# gC &=# n "c" &=# t "μs" &=# h "cdelay"
+    , crange = def "crange"        &=# n "C" &=# t "μs" &=# h "crange"
+    , ccap   = def "ccap"                    &=# t "n"  &=# h "ccap"
+    , cprob  = def "cprob"                   &=# t "%"  &=# h "cprob"
+    , c1     = False               &=# n "s"            &=# help hc1
     }
     &=# program "Unisex"
-    &=# summary "Solución de Manuel Gómez <targen@gmail.com> a la tarea 5 de CI4251 (Programación funcional avanzada) en Abril–Julio de 2012 en la Universidad Simón Bolívar"
+    &=# summary
+      ( "Solución de Manuel Gómez <targen@gmail.com> a la tarea 5 de "
+      ⧺ "CI4251 (Programación funcional avanzada) en Abril–Julio de "
+      ⧺ "2012 en la Universidad Simón Bolívar"
+      )
     &=# helpArg [help "Mostrar este mensaje de ayuda"]
     &=# versionArg [ignore]
 

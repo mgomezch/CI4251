@@ -1,6 +1,5 @@
-exec     := Unisex
-ghc      := ghc
-
+exec := Unisex
+ghc  := ghc
 
 .PHONY: all clean $(exec)
 
