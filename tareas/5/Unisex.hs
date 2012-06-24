@@ -10,6 +10,7 @@
 
 -- Supress currently unavoidable CmdArgs warnings
 {-# OPTIONS_GHC
+    -Wall
     -fno-warn-missing-fields
     -fno-warn-missing-signatures
     -fno-warn-unused-binds
@@ -42,7 +43,7 @@ import Data.Generics.Aliases           (mkQ)
 import Data.Generics.Schemes           (everything)
 import Data.IORef                      (newIORef, readIORef, writeIORef)
 import Data.Int                        (Int)
-import Data.List                       (any, drop, length, map, sum)
+import Data.List                       (drop, length, map, sum)
 import Data.Maybe                      (Maybe(Nothing, Just), fromJust, maybe)
 import Data.Ord                        ((<))
 import Data.Sequence                   ((<|), (|>), Seq, ViewL((:<)), empty, viewl)
