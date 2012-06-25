@@ -86,16 +86,6 @@ def a = case a of
 
 
 
-infixl 5 ⊲
-(⊲) ∷ α → Seq α → Seq α
-(⊲) = (<|)
-
-infixl 5 ⊳
-(⊳) ∷ Seq α → α → Seq α
-(⊳) = (|>)
-
-
-
 data Persona
   = Hombre
   | Mujer
@@ -130,11 +120,11 @@ unAccPr n
   | n ≤ accPr Mujer  = Mujer
   | otherwise        = PersonalDeLimpieza
 
-randomP ∷ (?args ∷ Args, RandomGen γ) ⇒ γ → (Persona, γ)
-randomP = randomRP (minBound, maxBound)
-
 randomRP ∷ (?args ∷ Args, RandomGen γ) ⇒ (Persona, Persona) → γ → (Persona, γ)
 randomRP = (succ ∘ accPr') ⁂ accPr ⋙ randomR ⋙ (⋙ first unAccPr)
+
+randomP ∷ (?args ∷ Args, RandomGen γ) ⇒ γ → (Persona, γ)
+randomP = randomRP (minBound, maxBound)
 
 
 
@@ -163,29 +153,20 @@ data Args = Args
   }
   deriving (Data, Show, Typeable)
 
-delay ∷ (?args ∷ Args) ⇒ Persona → Int
-delay p = f ?args
-  where
-    f = case p of
-      Hombre             → mdelay
-      Mujer              → fdelay
-      PersonalDeLimpieza → cdelay
+getArgs
+  ∷ (?args ∷ Args)
+  ⇒ (Args → Int) → (Args → Int) → (Args → Int)
+  → Persona → Int
+getArgs m f c p = getter ?args where
+  getter = case p of
+    Hombre             → m
+    Mujer              → f
+    PersonalDeLimpieza → c
 
-range ∷ (?args ∷ Args) ⇒ Persona → Int
-range p = f ?args
-  where
-    f = case p of
-      Hombre             → mrange
-      Mujer              → frange
-      PersonalDeLimpieza → crange
-
-cap ∷ (?args ∷ Args) ⇒ Persona → Int
-cap p = f ?args
-  where
-    f = case p of
-      Hombre             → mcap
-      Mujer              → fcap
-      PersonalDeLimpieza → ccap
+delay, range, cap ∷ (?args ∷ Args) ⇒ Persona → Int
+delay = getArgs mdelay fdelay cdelay
+range = getArgs mrange frange crange
+cap   = getArgs mcap   fcap   ccap
 
 
 
@@ -289,11 +270,11 @@ report S {..} = do
 
 
 pushFront ∷ Shared → Persona → STM ()
-pushFront S {..} a = modifyTVar queue (a ⊲)
+pushFront S {..} a = modifyTVar queue (a <|)
 
 
 pushBack ∷ Shared → Persona → STM ()
-pushBack S {..} a = modifyTVar queue (⊳ a)
+pushBack S {..} a = modifyTVar queue (|> a)
 
 
 pop ∷ Shared → STM (Maybe Persona)
@@ -304,7 +285,7 @@ pop S {..} = do
     _         → return mzero
 
 
-hdelay, hrange, hcap, hprob ∷ String
+hdelay, hrange, hcap, hprob, hc1 ∷ String
 hdelay = "Tiempo promedio de uso del baño"
 hrange = "Radio de variación del tiempo de uso"
 hcap   = "Número máximo que puede usar el baño simultáneamente"

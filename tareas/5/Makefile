@@ -6,7 +6,7 @@ ghc  := ghc
 all: $(exec)
 
 clean:
-	rm -f ./*.hi ./*.o $(exec)
+	rm -f ./*.aux ./*.hi ./*.log ./*.o ./*.out ./*.pdf $(exec)
 
 $(exec):
 	$(ghc) --make $@
