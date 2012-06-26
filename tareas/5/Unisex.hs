@@ -65,23 +65,23 @@ import System.Random                   (Random, RandomGen, getStdRandom, newStdG
 
 def ∷ String → Int
 def a = case a of
-  "gdelay" →  500000
-  "grange" →  100000
+  "gdelay" →   500000
+  "grange" →   100000
 
-  "mdelay" →  400000
-  "mrange" →  200000
-  "mcap"   →       3
-  "mprob"  →      49
+  "mdelay" →   400000
+  "mrange" →   200000
+  "mcap"   →        3
+  "mprob"  →       49
 
-  "fdelay" →  700000
-  "frange" →  400000
-  "fcap"   →       3
-  "fprob"  →      49
+  "fdelay" →   700000
+  "frange" →   400000
+  "fcap"   →        3
+  "fprob"  →       49
 
-  "cdelay" → 1000000
-  "crange" →  100000
-  "ccap"   →       1
-  "cprob"  →       2
+  "cdelay" → 10000000
+  "crange" →  1000000
+  "ccap"   →        1
+  "cprob"  →        2
   _        → undefined
 
 
@@ -225,7 +225,7 @@ door s @ S {..} = forever $ do
       j = range p
       t = fst $ randomR (d - j, d + j) g
 
-    writeTChan output $ "Entra " ⧺ show p ⧺ "(t = " ⧺ show t ⧺ "μs)"
+    writeTChan output $ "Entra " ⧺ show p ⧺ " (t = " ⧺ show t ⧺ "μs)"
     report s
     return (p, t)
 
@@ -330,9 +330,9 @@ $(cmdArgsQuote [d|
     }
     &=# program "Unisex"
     &=# summary
-      ( "Solución de Manuel Gómez <targen@gmail.com> a la tarea 5 de "
-      ⧺ "CI4251 (Programación funcional avanzada) en Abril–Julio de "
-      ⧺ "2012 en la Universidad Simón Bolívar"
+      ( "Solución de Manuel Gómez <targen@gmail.com> a la"
+      ⧺ " tarea 5 de CI4251 (Programación funcional avanzada)"
+      ⧺ " en Abril–Julio de 2012 en la Universidad Simón Bolívar"
       )
     &=# helpArg [help "Mostrar este mensaje de ayuda"]
     &=# versionArg [ignore]
@@ -346,8 +346,7 @@ main ∷ IO ()
 main = do
   args ← runArgs
 
-  let anyNegative = everything (∨) (mkQ False ((< 0) :: Int → Bool)) args
-  when anyNegative $ do
+  when (everything (∨) (mkQ False ((< 0) :: Int → Bool)) args) $ do
       putStrLn "Ningún argumento numérico puede ser negativo."
       exitFailure
 
