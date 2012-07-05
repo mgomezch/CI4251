@@ -1,0 +1,19 @@
+Name:          collapse
+Version:       0
+Author:        Manuel Gómez <targen@gmail.com>
+Build-Type:    Simple
+Cabal-Version: >=1.8
+Description:   Solución a la tarea 6 de CI4251 en Abril–Julio 2012 en la Universidad Simón Bolívar.
+
+Executable collapse
+  Build-depends: base            == 4.5.*  ,
+                 vector          == 0.9.*  ,
+                 old-time        == 1.1.*  ,
+                 containers      == 0.4.*  ,
+                 HUnit           == 1.2.*  ,
+                 dph-base        == 0.6.1.*,
+                 dph-prim-par    == 0.6.1.*,
+                 dph-lifted-vseg == 0.6.1.*
+  Main-is:       Main.hs
+  other-modules: Vectorised
+  ghc-options:   -rtsopts -threaded -fllvm -Odph -package dph-lifted-vseg -fcpr-off -fno-liberate-case -fsimpl-tick-factor=1000
