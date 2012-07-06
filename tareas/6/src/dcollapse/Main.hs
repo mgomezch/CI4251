@@ -1,7 +1,8 @@
 module Main (main) where
 
-import Vectorised
-import Data.Array.Parallel
-import Data.Array.Parallel.PArray
+import Data.Array.Parallel.PArray (fromList, toList)
+import System.Environment (getArgs)
 
-main = print . toList . doStuff . fromList $ [1..100]
+import Vectorised (collapse)
+
+main = print . toList . collapse . fromList . enumFromTo 1 . read . head =<< getArgs

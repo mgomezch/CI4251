@@ -1,15 +1,13 @@
 module Main (main) where
 
 import Control.Parallel.Strategies (parMap, rpar)
-import Data.Char                   (digitToInt  )
+
+import qualified Collapse as C
 
 parSumMap :: (a -> Int) -> [a] -> Int
 parSumMap f = sum . parMap rpar f
 
-betterCollapse :: Int -> Int
-betterCollapse = until (<10) $ parSumMap digitToInt . show
-
 pcollapse :: [Int] -> Int
-pcollapse = betterCollapse . parSumMap betterCollapse
+pcollapse = C.collapse . parSumMap C.collapse
 
 main = print $ pcollapse [0..1000000]

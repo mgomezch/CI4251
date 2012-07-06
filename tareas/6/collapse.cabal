@@ -8,18 +8,18 @@ Description  : Solución a la tarea 6 de CI4251 en Abril–Julio 2012 en la Univ
 Executable collapse
   Build-depends : base == 4.5.*
   Main-is       : Main.hs
---other-modules : Collapse
+  other-modules : Collapse
   hs-source-dirs: src/collapse
---                src/lib
+                  src/lib
   ghc-options   : -rtsopts -threaded -fllvm -O3
 
 Executable pcollapse
   Build-depends : base == 4.5.*,
                   parallel
   Main-is       : Main.hs
---other-modules : Collapse
+  other-modules : Collapse
   hs-source-dirs: src/pcollapse
---                src/lib
+                  src/lib
   ghc-options   : -rtsopts -threaded -fllvm -O3
 
 Executable dcollapse
