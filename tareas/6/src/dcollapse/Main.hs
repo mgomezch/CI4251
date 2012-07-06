@@ -5,4 +5,4 @@ import System.Environment (getArgs)
 
 import Vectorised (collapse)
 
-main = print . toList . collapse . fromList . enumFromTo 1 . read . head =<< getArgs
+main = print . collapse . fromList . enumFromTo 1 . read . head =<< getArgs
