@@ -5,4 +5,6 @@ import System.Environment (getArgs)
 
 import Vectorised (collapse)
 
-main = print . collapse . fromList . enumFromTo 1 . read . head =<< getArgs
+import qualified Collapse as C
+
+main = C.main $ collapse . fromList

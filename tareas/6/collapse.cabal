@@ -24,10 +24,9 @@ Executable pcollapse
 
 Executable dcollapse
   Build-depends : base            == 4.5.*  ,
-                  dph-base        == 0.6.1.*,
-                  dph-prim-par    == 0.6.1.*,
                   dph-lifted-vseg == 0.6.1.*
   Main-is       : Main.hs
-  other-modules : Vectorised
+  other-modules : Collapse Vectorised
   hs-source-dirs: src/dcollapse
+                  src/lib
   ghc-options   : -rtsopts -threaded -fllvm -Odph -package dph-lifted-vseg -fcpr-off -fno-liberate-case -fsimpl-tick-factor=1000

@@ -1,0 +1,247 @@
+\documentclass[11pt,fleqn]{article}
+
+\usepackage{color}
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes}
+
+\definecolor{brown}{rgb}{0.7,0.2,0}
+\definecolor{darkgreen}{rgb}{0,0.6,0.1}
+\definecolor{darkgrey}{rgb}{0.4,0.4,0.4}
+\definecolor{midgrey}{rgb}{0.9,0.9,0.9}
+\definecolor{lightgrey}{rgb}{0.95,0.95,0.95}
+
+
+\usepackage[spanish]{babel}
+\usepackage{lmodern}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{listings}
+\usepackage[colorlinks=true,urlcolor=blue]{hyperref}
+
+\usepackage{framed}
+\usepackage{verbatim}
+
+\lstset{
+   language=Haskell,
+   gobble=2,
+   frame=single,
+   framerule=1pt,
+   showstringspaces=false,
+   basicstyle=\footnotesize\ttfamily,
+   keywordstyle=\textbf,
+   backgroundcolor=\color{lightgrey},
+   literate={á}{{\'a}}1
+            {é}{{\'e}}1
+            {í}{{\'i}}1
+            {ó}{{\'o}}1
+            {ú}{{\'u}}1
+            {ñ}{{\~n}}1
+}
+
+\newenvironment{answer}{%
+  \def\FrameCommand{\fboxsep=\FrameSep \fcolorbox{black}{midgrey}}%
+  \color{black}\MakeFramed {\FrameRestore}}%
+ {\endMakeFramed}
+
+\begin{document}
+
+\title{CI4251 - Programación Funcional Avanzada \\
+Solución de la tarea 6}
+
+\author{Manuel Gómez\\
+05-38235\\
+\href{mailto:targen@gmail.com}{<targen@gmail.com>}}
+
+\date{Julio 05, 2012}
+
+\maketitle
+
+\pagebreak
+
+\section{Paralelismo}
+
+El \textbf{colapso} de un número entero corresponde a la suma de
+sus dígitos, proceso que puede seguirse recursivamente hasta
+llegar a un dígito final. Por ejemplo, el colapso de 134957 es 29,
+que a su vez colapsa en 11 que finalmente colapsa en 2.
+
+Definiremos el colapso de una lista de enteros como el colapso
+de la suma de los colapsos de los enteros que le componen.
+
+\begin{itemize}
+\item
+  \emph{Baseline} \textbf{(1 punto)} -- escriba una función no paralela
+
+\begin{lstlisting}
+  collapse :: [Int] -> Int
+\end{lstlisting}
+
+  que calcule el colapso de una lista de enteros. Evalúe su
+  desempeño trabajando sobre listas que tomen al menos dos
+  minutos en ser procesadas hasta obtener el resultado
+  (¡aproveche \verb=QuickCheck= con semillas manuales!).
+
+\begin{answer}
+  El cálculo del colapso de un entero se hizo explotando una fórmula
+  cerrada sencilla usando el resto de la división entera.  Como se
+  formuló la solución usando ejecutables separados para cada versión
+  ---porque así resultaría más fácil medir el rendimiento en
+  ejecución--- se abstrayó en un módulo aparte el comportamiento común.
+
+\begin{lstlisting}
+  module Collapse (collapse, main) where
+    import System.Environment (getArgs)
+
+    collapse :: Int -> Int
+    collapse n = 1 + (n - 1) `mod` 9
+
+    main :: ([Int] -> Int) -> IO ()
+    main c = print.c.enumFromTo 0.read.head =<< getArgs
+\end{lstlisting}
+
+  \texttt{Collapse.main} no es un cómputo \texttt{IO} que pueda ser
+  usado directamente como el cómputo principal de un ejecutable, pero
+  abstrae el comportamiento de los tres ejecutables de esta solución.
+  Se usa para calcular el colapso de la lista de todos los enteros desde
+  el cero hasta un entero dado como argumento de línea de comandos.
+
+  Aunque hubiera sido trivial ---\texttt{take <\$> (read . head <\$>
+  getArgs) <*> (randoms <\$> newStdGen)} para generar muchos números
+  aleatorios, o algo muy similar con \texttt{mkStdGen} para tomar
+  también la semilla de un argumento de línea de comandos--- se decidió
+  trabajar con listas de números secuenciales; lo que afecta el
+  rendimiento es principalmente el tamaño de la lista, y la posibilidad
+  de memorización de colapsos de números particulares no podría tener un
+  efecto demasiado significativo considerando que su cálculo consiste de
+  tres operaciones aritméticas.
+
+  La implantación secuencial utiliza un \texttt{fold} estricto para
+  calcular la suma de los colapsos de la lista.  No se usó simplemente
+  \texttt{sum . map C.collapse} porque actualmente no se realiza fusión
+  entre \texttt{sum} y \texttt{map}; hay algunos comentarios sobre este
+  problema en \href{
+    http://www.haskell.org/pipermail/haskell-cafe/2012-June/101971.html
+  }{una discusión reciente sobre el tema en \textit{Haskell-cafe}}.
+
+\begin{lstlisting}
+  module Main (main) where
+    import Data.Foldable (foldl')
+    import qualified Collapse as C
+
+    collapse :: [Int] -> Int
+    collapse =
+      C.collapse . foldl' (\ a n -> a + C.collapse n) 0
+
+    main = C.main collapse
+\end{lstlisting}
+\end{answer}
+
+\item
+  \emph{Paralelismo implícito} \textbf{(4 puntos)} -- escriba la función
+
+\begin{lstlisting}
+  pcollapse :: [Int] -> Int
+\end{lstlisting}
+
+  que efectúe el mismo cálculo pero empleando paralelismo implícito,
+  aprovechando las anotaciones paralelas de \texttt{Control.Parallel}.
+  Si lo considera conveniente, puede definir estrategias \emph{ad hoc}
+  en base a las primitivas de \texttt{Control.Parallel.Strategies}.
+
+\begin{answer}
+  Se siguió exactamente el esquema anterior, pero usando un \texttt{map}
+  paralelo.  No se hizo nada más interesante (como limitar la creación
+  de \textit{sparks}) porque no se tuvo acceso a un sistema SMP donde se
+  pudiera hacer mediciones o pruebas.
+
+\begin{lstlisting}
+  module Main (main) where
+    import Control.Parallel.Strategies (parMap, rpar)
+    import qualified Collapse as C
+
+    pcollapse :: [Int] -> Int
+    pcollapse = C.collapse . sum . parMap rpar C.collapse
+
+    main = C.main pcollapse
+\end{lstlisting}
+\end{answer}
+
+\item
+  \emph{Datos paralelos} \textbf{(4 puntos)} -- escriba la función
+
+\begin{lstlisting}
+  dcollapse :: [Int] -> Int
+\end{lstlisting}
+
+  que efectúe el mismo cálculo pero empleando paralelismo implícito,
+  aprovechando las construcciones de \emph{Data Parallel Haskell}.
+  Note que el tipo de \texttt{dcollapse} implica que debe aprovechar
+  DPH a través de funciones auxiliares. Más aún, la solución
+  \emph{correcta} usando DPH solamente requiere \textbf{una}
+  función auxiliar.
+
+\begin{answer}
+  Se usó la implantación de \textit{Data Parallel Haskell} disponible en
+  la versión 0.6.1.2 del paquete \texttt{dph-lifted-vseg} sobre GHC
+  7.4.2.  Esta parte de la solución reside en dos módulos: uno con el
+  cómputo \texttt{IO} principal del ejecutable, que no es vectorizable,
+  y otro con la parte vectorizable.
+
+  El módulo principal simplemente llama al módulo vectorizado con la
+  lista generada usando el argumento de línea de comandos de la misma
+  manera que en las otras dos partes de esta solución:
+
+\begin{lstlisting}
+  module Main (main) where
+    import Data.Array.Parallel.PArray (fromList, toList)
+    import System.Environment         (getArgs)
+
+    import Vectorised (collapse)
+    import qualified Collapse as C
+
+    main = C.main $ collapse . fromList
+\end{lstlisting}
+
+  El módulo vectorizado exporta una función de interfaz que recibe el
+  arreglo del módulo principal y lo transforma en un arreglo paralelo
+  para poder trabajar con código vectorizado; el código vectorizado es
+  quien efectúa el colapso de la suma de los colapsos del arreglo dado.
+
+\begin{lstlisting}
+  {-# OPTIONS -fvectorise #-}
+  {-# LANGUAGE ParallelArrays, ParallelListComp #-}
+
+  module Vectorised (collapse) where
+    import Data.Array.Parallel (toPArrayP, fromPArrayP)
+    import Data.Array.Parallel.PArray (PArray)
+    import qualified Data.Array.Parallel.Prelude.Int as I
+
+    {-# NOINLINE collapse #-}
+    collapse :: PArray Int -> Int
+    collapse xs = collapse' (fromPArrayP xs)
+
+    collapse' :: [:Int:] -> Int
+    collapse' ns=collapse1 (I.sumP [:collapse1 n | n<-ns:])
+
+    collapse1 :: Int -> Int
+    collapse1 n = 1 I.+ (n I.- 1) `I.mod` 9
+\end{lstlisting}
+\end{answer}
+\end{itemize}
+
+Para terminar \textbf{(1 punto)}, compare el desempeño de las funciones
+\texttt{collapse}, \texttt{pcollapse} y \texttt{dcollapse} operando sobre
+uno y dos núcleos. Procure ajustar \texttt{pcollapse} para obtener el máximo
+desempeño posible sobre \textbf{dos} núcleos.
+
+Es suficiente sustentar su comparación empleando las estadísticas emitidas
+por el \emph{Runtime System}, sin embargo Ud. es libre de usar
+\texttt{Criterion} si lo desea. En todo caso, los tres mejores
+\emph{speedups} en mi máquina, recibirán tres (3), dos (2) y un (1) punto
+adicional, respectivamente.
+
+\begin{answer}
+  No se pudo disponer de un sistema SMP donde pudieran hacerse medidas
+  del comportamiento de esta solución en presencia de paralelismo.
+\end{answer}
+\end{document}
